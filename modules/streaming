@@ -1,0 +1,12 @@
+def stream_candles(msg):
+    event_time = pd.to_datetime(msg["E"], unit="ms")
+    start_time = pd.to_datetime(msg["k"]["t"], unit="ms")
+    first = float(msg["k"]["o"])
+    high = float(msg["k"]["h"])
+    low = float(msg["k"]["l"])
+    close = float(msg["k"]["c"])
+    volume = float(msg["k"]["v"])
+    complete = msg["k"]["x"]
+    print("Time: {} | Price: {}".format(event_time,close))
+    df.loc[start_time] = [first, high, low, close, volume, complete]
+    
