@@ -1,3 +1,6 @@
+from binance.client import Client
+import pandas as pd
+
 def get_history(symbol, interval, start, end = None):
     bars = client.get_historical_klines(symbol=symbol, interval=interval,
                                         start_str=start, end_str=end, limit=1000)
