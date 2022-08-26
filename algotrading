@@ -1,0 +1,91 @@
+import datetime
+
+from binance.client import Client
+import pandas as pd
+from binance import ThreadedWebsocketManager
+import numpy as np
+from datetime import date, timedelta
+
+api_key = ""
+secret_key = ""
+
+client = Client(api_key=api_key, api_secret=secret_key, tld="com", testnet=True)
+client.get_system_status()
+account = client.get_account()
+df = pd.DataFrame(account["balances"])
+df.free = pd.to_numeric(df.free, errors="coerce")
+df.locked = pd.to_numeric(df.locked, errors="coerce")
+last24 = client.get_ticker(symbol="BTCUSDT")
+timestamp = client._get_earliest_valid_timestamp(symbol="BTCUSDT", interval="1d")
+pd.to_datetime(timestamp, unit="ms")
+
+df = get_history(symbol="BTCUSDT", interval="1d", start=timestamp)
+
+twm = ThreadedWebsocketManager()
+twm.start()
+twm.start_symbol_miniticker_socket(callback=stream_data, symbol="BTCUSDT")
+twm.stop()
+
+account
+buy = client.create_order(symbol="BTCUSDT", side="BUY", type="MARKET", quantity=0.01)
+buy
+df = pd.DataFrame(buy["fills"])
+sell = client.create_order(symbol='BTCUSDT', side="SELL", type="MARKET", quantity=0.01)
+limit_buy = client.create_order(symbol="BTCUSDT", side="BUY", type="LIMIT", timeInForce="GTC", quantity=0.01,
+                                price=22000)
+limit_sell = client.create_order(symbol='BTCUSDT', side="SELL", type="LIMIT", timeInForce="GTC", quantity=0.01,
+                                 price=21000)
+order_id_buy = limit_buy["orderId"]
+order_id_buy = limit_sell["orderId"]
+
+
+
+def stream_data(msg):
+    time = pd.to_datetime(msg["E"], unit="ms")
+    price = msg["c"]
+
+    print("Time : {} | Price : {}".format(time, price))
+
+
+def get_history(symbol, interval, start, end=None):
+    bars = client.get_historical_klines(symbol=symbol, interval=interval,
+                                        start_str=start, end_str=end, limit=1000)
+    df = pd.DataFrame(bars)
+    df["Date"] = pd.to_datetime(df.iloc[:, 0], unit="ms")
+    df.columns = ["Open Time", "Open", "High", "Low", "Close", "Volume", "clos Time", "Quote Asset Volume",
+                  "Number of Trades", "Taker Buy Base Asset Volume",
+                  "Taker Buy Quote Asset Volume", "ignore", "Date"]
+    df = df[["Date", "Open", "High", "Low", "Close", "Volume"]].copy()
+    df.set_index("Date", inplace=True)
+    for column in df.columns:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    return df
+
+
+def stream_candles(msg):
+    event_time = pd.to_datetime(msg["E"], unit="ms")
+    start_time = pd.to_datetime(msg["k"]["t"], unit="ms")
+    first = float(msg["k"]["o"])
+    high = float(msg["k"]["h"])
+    low = float(msg["k"]["l"])
+    close = float(msg["k"]["c"])
+    volume = float(msg["k"]["v"])
+    complete = msg["k"]["x"]
+    print("Time: {} | Price: {}".format(event_time, close))
+    df.loc[start_time] = [first, high, low, close, volume, complete]
+
+
+def simple_bot(msg):
+    time = pd.to_datetime(msg["E"], unit="ms")
+    price = float(msg["c"])
+
+    print("Time : {} | Price : {}".format(time, price))
+
+    if int(price) % 10 == 0:
+        order = client.create_order(symbol="BTCUSDT", side="BUY", type="MARKET", quantity=0.01)
+        print("\n" + 50 * "-")
+        print("Buy {} BTC for {} USDT".format(order["executedQty"], order["cummulativeQuoteQty"]))
+        print(50*"-"+"\n")
+
+        twm.stop()
+
